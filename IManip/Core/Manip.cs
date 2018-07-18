@@ -234,10 +234,14 @@ namespace IManip.Core
                 {
                     if (result[i, j] == EmptyPixel)
                     {
-                        result[i, j] = Color.FromArgb((result[i - 1, j].A + result[i, j - 1].A + result[i + 1, j].A + result[i, j + 1].A) / 4,
-                                                      (result[i - 1, j].R + result[i, j - 1].R + result[i + 1, j].R + result[i, j + 1].R) / 4,
-                                                      (result[i - 1, j].G + result[i, j - 1].G + result[i + 1, j].G + result[i, j + 1].G) / 4,
-                                                      (result[i - 1, j].B + result[i, j - 1].B + result[i + 1, j].B + result[i, j + 1].B) / 4);
+
+                        result[i, j] = PackagingColor(result[i - 1, j], result[i, j - 1], result[i + 1, j], result[i, j + 1],
+                                                     result[i - 1, j - 1], result[i + 1, j - 1], result[i - 1, j + 1], result[i + 1, j + 1]);
+
+                        //result[i, j] = Color.FromArgb((result[i - 1, j].A + result[i, j - 1].A + result[i + 1, j].A + result[i, j + 1].A) / 4,
+                        //                              (result[i - 1, j].R + result[i, j - 1].R + result[i + 1, j].R + result[i, j + 1].R) / 4,
+                        //                              (result[i - 1, j].G + result[i, j - 1].G + result[i + 1, j].G + result[i, j + 1].G) / 4,
+                        //                              (result[i - 1, j].B + result[i, j - 1].B + result[i + 1, j].B + result[i, j + 1].B) / 4);
                     }
                 }
             }
@@ -298,13 +302,133 @@ namespace IManip.Core
         {
             Bitmap result = new Bitmap(currentWidth, currentHeight, PixelFormat.Format32bppArgb);
 
-            result.RotateFlip(RotateFlipType.RotateNoneFlipNone);
-            
             for (int i = 0; i < currentWidth; i++)
             {
                 for (int j = 0; j < currentHeight; j++)
                 {
                     result.SetPixel(i, j, pixels[i, j]);
+                }
+            }
+
+            result = AddContrast(result);
+
+            result.RotateFlip(RotateFlipType.RotateNoneFlipNone);
+
+            return result;
+        }
+
+        private Color PackagingColor(params Color[] colors)
+        {
+            //0..3 - near
+            //4..7 - obliquely
+
+            Color content;
+            Color tempNear;
+            Color tempObliquely;
+
+            Random random = new Random();
+
+            tempNear = Color.FromArgb(((colors[0].A + colors[1].A + colors[2].A + colors[3].A) / 4),
+                                      ((colors[0].R + colors[1].R + colors[2].R + colors[3].R) / 4),
+                                      ((colors[0].G + colors[1].G + colors[2].G + colors[3].G) / 4),
+                                      ((colors[0].B + colors[1].B + colors[2].B + colors[3].B) / 4));
+
+            tempObliquely = Color.FromArgb(((colors[4].A + colors[5].A + colors[6].A + colors[7].A) / 4),
+                                           ((colors[4].R + colors[5].R + colors[6].R + colors[7].R) / 4),
+                                           ((colors[4].G + colors[5].G + colors[6].G + colors[7].G) / 4),
+                                           ((colors[4].B + colors[5].B + colors[6].B + colors[7].B) / 4));
+
+            tempObliquely = Color.FromArgb((tempObliquely.A + colors[random.Next(0, 3)].A) / 2,
+                                           (tempObliquely.R + colors[random.Next(0, 3)].R) / 2,
+                                           (tempObliquely.G + colors[random.Next(0, 3)].G) / 2,
+                                           (tempObliquely.B + colors[random.Next(0, 3)].B) / 2);
+
+            tempObliquely = Color.FromArgb((tempObliquely.A + colors[random.Next(4, 7)].A) / 2,
+                                           (tempObliquely.R + colors[random.Next(4, 7)].R) / 2,
+                                           (tempObliquely.G + colors[random.Next(4, 7)].G) / 2,
+                                           (tempObliquely.B + colors[random.Next(4, 7)].B) / 2);
+
+            content = Color.FromArgb((tempNear.A + tempObliquely.A) / 2,
+                                     (tempNear.R + tempObliquely.R) / 2,
+                                     (tempNear.G + tempObliquely.G) / 2,
+                                     (tempNear.B + tempObliquely.B) / 2);
+
+
+            return content;
+        }
+
+        public Bitmap AddContrast(Bitmap currentBitmap)
+        {
+            Color c;
+            float contrast = 5.0f;
+
+            if (contrast < -100.0f)
+                contrast = -100.0f;
+
+            if (contrast > 100.0f)
+                contrast = 100.0f;
+
+            contrast = (100.0f + contrast) / 100.0f;
+            contrast *= contrast;
+
+            Bitmap temp = currentBitmap;
+            Bitmap result = temp.Clone() as Bitmap;
+
+            Rectangle rect = new Rectangle(0, 0, temp.Width, temp.Height);
+            BitmapData bmpData = temp.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+
+            unsafe
+            {
+                byte* ptr = (byte*)bmpData.Scan0;
+
+                for (int y = 0; y < temp.Width; y++)
+                {
+                    var row = ptr + (y * bmpData.Stride);
+
+                    for (int x = 0; x < temp.Height; x++)
+                    {
+                        var pixel = row + x * 4;
+
+                        c = Color.FromArgb(pixel[3], pixel[2], pixel[1], pixel[0]);
+
+                        float pR = c.R / 255.0f;
+                        pR -= 0.5f;
+                        pR *= contrast;
+                        pR += 0.5f;
+                        pR *= 255;
+
+                        if (pR < 0)
+                            pR = 0;
+
+                        if (pR > 255)
+                            pR = 255;
+
+                        float pG = c.G / 255.0f;
+                        pG -= 0.5f;
+                        pG *= contrast;
+                        pG += 0.5f;
+                        pG *= 255;
+
+                        if (pG < 0)
+                            pG = 0;
+
+                        if (pG > 255)
+                            pG = 255;
+
+                        float pB = c.B / 255.0f;
+                        pB -= 0.5f;
+                        pB *= contrast;
+                        pB += 0.5f;
+                        pB *= 255;
+
+                        if (pB < 0)
+                            pB = 0;
+
+                        if (pB > 255)
+                            pB = 255;
+
+                        result.SetPixel(y, x, Color.FromArgb((byte)pR, (byte)pG, (byte)pB));
+                    }
                 }
             }
 
@@ -327,7 +451,7 @@ namespace IManip.Core
             image.EndInit();
 
             Image img = Image.FromStream(ms);
-            img.RotateFlip(RotateFlipType.Rotate90FlipX);
+            //img.RotateFlip(RotateFlipType.Rotate90FlipX);
             img.Save(pathToSaveFile + "\\temp\\Picture" + String.Format("{0:yMdhms}", DateTime.Now) + ".png", ImageFormat.Png);
 
             return image;
