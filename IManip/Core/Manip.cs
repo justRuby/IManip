@@ -73,6 +73,13 @@ namespace IManip.Core
 
             int height = ARGBModel.GetLength(0), width = ARGBModel.GetLength(1);
 
+            //Check proportionality
+
+            if (height > width)
+                height = width;
+            else
+                width = height;
+
             for (int i = 0; i < height; i++)
             {
                 for (int j = 0; j < width; j++)
@@ -83,7 +90,7 @@ namespace IManip.Core
 
             int currentWidth = (width * 2) + EXPANSION;
             int currentHeight = (height * 2) + EXPANSION;
-            
+
             var PixelArray = AddNewPixelsToOld(ARGBList, currentWidth, currentHeight);
             var Result = ColorizeNewPixels(PixelArray, currentWidth, currentHeight);
 
@@ -122,21 +129,28 @@ namespace IManip.Core
 
         private Color[,] ColorizeNewPixels(Color[,] pixels, int currentWidth, int currentHeight)
         {
+            Color EmptyPixel = Color.FromArgb(255, 255, 255, 255);
             Color[,] result = pixels;
             bool skip = false;
+            int currentPosition = 2;
 
-            //Step 1
             //Colorize Near Pixels
+            #region Step 1
+
             for (int i = 0; i < currentWidth; i++)
             {
                 for (int j = 0; j < currentHeight; j++)
                 {
                     if (skip)
-                        continue;
-
-                    if(result[i,j].Name != "0")
                     {
-                        if(j + 2 < currentHeight && result[i, j + 2] != Color.FromArgb(255, 255, 255, 255))
+                        skip = false;
+                        continue;
+                    }
+
+                    if (result[i, j].Name != "0")
+                    {
+
+                        if (j + 2 < currentHeight && result[i, j + 2] != Color.FromArgb(255, 255, 255, 255))
                         {
                             Color currentColor = result[i, j];
                             Color nextColor = result[i, j + 2];
@@ -158,16 +172,124 @@ namespace IManip.Core
                             result[i + 1, j] = color;
                         }
 
-                        //skip = true;
+                        skip = true;
                     }
-                    //Step 2
-                    //Colorize even Line Pixels BORDER
-                    else
+
+                }
+            }
+
+            #endregion
+
+            //Colorize outside pixels BORDER
+            #region Step 2
+
+            if (result[1, 1] != EmptyPixel)
+            {
+                result[0, 0] =
+                result[1, 0] =
+                result[0, 1] = Color.FromArgb(result[1, 1].A,
+                                              result[1, 1].R,
+                                              result[1, 1].G,
+                                              result[1, 1].B);
+            }
+
+            if (result[currentWidth - 2, 1] != EmptyPixel)
+            {
+                result[currentWidth - 1, 0] =
+                result[currentWidth - 2, 0] =
+                result[currentWidth - 1, 1] = Color.FromArgb(result[currentWidth - 2, 1].A,
+                                                             result[currentWidth - 2, 1].R,
+                                                             result[currentWidth - 2, 1].G,
+                                                             result[currentWidth - 2, 1].B);
+            }
+
+            if (result[1, currentHeight - 2] != EmptyPixel)
+            {
+                result[0, currentHeight - 1] =
+                result[0, currentHeight - 2] =
+                result[1, currentHeight - 1] = Color.FromArgb(result[1, currentHeight - 2].A,
+                                                              result[1, currentHeight - 2].R,
+                                                              result[1, currentHeight - 2].G,
+                                                              result[1, currentHeight - 2].B);
+            }
+
+            if (result[currentWidth - 2, currentHeight - 2] != EmptyPixel)
+            {
+                result[currentWidth - 1, currentHeight - 1] =
+                result[currentWidth - 2, currentHeight - 1] =
+                result[currentWidth - 1, currentHeight - 2] = Color.FromArgb(result[currentWidth - 2, currentHeight - 2].A,
+                                                                             result[currentWidth - 2, currentHeight - 2].R,
+                                                                             result[currentWidth - 2, currentHeight - 2].G,
+                                                                             result[currentWidth - 2, currentHeight - 2].B);
+            }
+
+            #endregion
+
+            //Colorize inner pixels
+            #region Step 2.1
+
+            for (int i = 1; i < currentWidth - 1; i++)
+            {
+                for (int j = 1; j < currentHeight - 1; j++)
+                {
+                    if (result[i, j] == EmptyPixel)
                     {
-                        result[i, j] = Color.FromArgb(255, 0, 0, 0); //Black
+                        result[i, j] = Color.FromArgb((result[i - 1, j].A + result[i, j - 1].A + result[i + 1, j].A + result[i, j + 1].A) / 4,
+                                                      (result[i - 1, j].R + result[i, j - 1].R + result[i + 1, j].R + result[i, j + 1].R) / 4,
+                                                      (result[i - 1, j].G + result[i, j - 1].G + result[i + 1, j].G + result[i, j + 1].G) / 4,
+                                                      (result[i - 1, j].B + result[i, j - 1].B + result[i + 1, j].B + result[i, j + 1].B) / 4);
                     }
                 }
             }
+
+            #endregion
+
+            //Colorize outside line of pixels BORDER
+            #region Step 3.1
+
+            while (result[currentPosition, 0] == EmptyPixel)
+            {
+                result[currentPosition, 0] = Color.FromArgb((result[currentPosition - 1, 0].A + result[currentPosition, 1].A) / 2,
+                                                            (result[currentPosition - 1, 0].R + result[currentPosition, 1].R) / 2,
+                                                            (result[currentPosition - 1, 0].G + result[currentPosition, 1].G) / 2,
+                                                            (result[currentPosition - 1, 0].B + result[currentPosition, 1].B) / 2);
+                currentPosition++;
+            }
+
+            currentPosition = 2;
+
+            while (result[0, currentPosition] == EmptyPixel)
+            {
+                result[0, currentPosition] = Color.FromArgb((result[0, currentPosition - 1].A + result[1, currentPosition].A) / 2,
+                                                            (result[0, currentPosition - 1].R + result[1, currentPosition].R) / 2,
+                                                            (result[0, currentPosition - 1].G + result[1, currentPosition].G) / 2,
+                                                            (result[0, currentPosition - 1].B + result[1, currentPosition].B) / 2);
+                currentPosition++;
+            }
+
+            currentPosition = 2;
+
+            while (result[currentPosition, currentWidth - 1] == EmptyPixel)
+            {
+                result[currentPosition, currentWidth - 1] = Color.FromArgb((result[currentPosition - 1, currentWidth - 1].A + result[currentPosition, currentWidth - 2].A) / 2,
+                                                                           (result[currentPosition - 1, currentWidth - 1].R + result[currentPosition, currentWidth - 2].R) / 2,
+                                                                           (result[currentPosition - 1, currentWidth - 1].G + result[currentPosition, currentWidth - 2].G) / 2,
+                                                                           (result[currentPosition - 1, currentWidth - 1].B + result[currentPosition, currentWidth - 2].B) / 2);
+                currentPosition++;
+            }
+
+            currentPosition = 2;
+
+            while (result[currentHeight - 1, currentPosition] == EmptyPixel)
+            {
+                result[currentHeight - 1, currentPosition] = Color.FromArgb((result[currentHeight - 1, currentPosition - 1].A + result[currentHeight - 2, currentPosition].A) / 2,
+                                                                            (result[currentHeight - 1, currentPosition - 1].R + result[currentHeight - 2, currentPosition].R) / 2,
+                                                                            (result[currentHeight - 1, currentPosition - 1].G + result[currentHeight - 2, currentPosition].G) / 2,
+                                                                            (result[currentHeight - 1, currentPosition - 1].B + result[currentHeight - 2, currentPosition].B) / 2);
+                currentPosition++;
+            }
+
+            #endregion
 
             return result;
         }
