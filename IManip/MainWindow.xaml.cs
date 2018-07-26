@@ -42,12 +42,9 @@ namespace IManip
                 };
 
                 BasedImage.Source = image.Source;
-                
-                Manip test = new Manip();
-                test.TakePixelsFromByteArray(openFileDialog.FileName);
-            }
-            
 
+                MCore.path = openFileDialog.FileName;
+            }
         }
 
         private void ConvertImageButton_Click(object sender, RoutedEventArgs e)
@@ -55,7 +52,7 @@ namespace IManip
             Manip test = new Manip();
             ImageSourceConverter imageSourceConverter = new ImageSourceConverter();
 
-            ConvertedImage.Source = test.MyConvertBitmap();
+            ConvertedImage.Source = MCore.HandleImage(true, false);
         }
 
 

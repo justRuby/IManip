@@ -5,13 +5,26 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:IManip"
         mc:Ignorable="d"
-        Title="MainWindow" Height="627" Width="800">
+        Title="IManip" Height="627" Width="800" WindowStartupLocation="CenterScreen">
     <Grid>
         <Button x:Name="LoadImageButton" Content="Загрузить" HorizontalAlignment="Center" Margin="0,0,0,20" VerticalAlignment="Bottom" Width="120" BorderBrush="{x:Null}" Background="#FFF0F0F0" Click="LoadImageButton_Click"/>
         <Button x:Name="ConvertImageButton" Content="Преобразовать" HorizontalAlignment="Center" Margin="0,0,0,40" VerticalAlignment="Bottom" Width="120" BorderBrush="{x:Null}" Background="#FFF0F0F0" Click="ConvertImageButton_Click"/>
         <Grid HorizontalAlignment="Center" Height="521" Margin="15,10,5,0" VerticalAlignment="Top" Width="772">
-            <Image x:Name="BasedImage" HorizontalAlignment="Left" Margin="10,98,0,137" Width="240" Height="240"/>
-            <Image x:Name="ConvertedImage" Height="480" Margin="0,0,10,0" Width="480" HorizontalAlignment="Right" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" RenderTransformOrigin="0.5,0.5" Stretch="Fill"/>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="71*"/>
+                <ColumnDefinition Width="122*"/>
+            </Grid.ColumnDefinitions>
+            <Image x:Name="BasedImage" HorizontalAlignment="Left" Margin="10,0,0,0" Width="360" Height="360" Stretch="UniformToFill" Grid.ColumnSpan="2"/>
+            <Image x:Name="ConvertedImage" Height="360" Margin="0,0,10,0" Width="360" HorizontalAlignment="Right" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" RenderTransformOrigin="0.5,0.5" Stretch="UniformToFill" Grid.Column="1">
+                <Image.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform/>
+                        <SkewTransform/>
+                        <RotateTransform Angle="-90"/>
+                        <TranslateTransform/>
+                    </TransformGroup>
+                </Image.RenderTransform>
+            </Image>
         </Grid>
 
     </Grid>

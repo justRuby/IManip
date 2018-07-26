@@ -1,35 +1,33 @@
-﻿using System.Collections.Generic;
-using System.IO;
+﻿using IManip.Model;
+using IManip.Core.Module;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
-
-using IManip.Model;
-using Newtonsoft.Json;
+using System.IO;
 using System.Windows.Media.Imaging;
-using System;
+using System.Collections.Generic;
 
 namespace IManip.Core
 {
-    internal class Manip 
+    public static class MCore
     {
         private const int EXPANSION = 1;
-        private string pathToSaveFile = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
 
-        internal Manip() { }
+        public static string path;
+        private static readonly string _pathToSaveFile = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
 
-        internal void TakePixelsFromByteArray(string path)
+        public static BitmapImage HandleImage(bool contrast = false, bool harshness = false)
         {
-            if (!Directory.Exists(pathToSaveFile + "\\temp"))
-                Directory.CreateDirectory(pathToSaveFile + "\\temp");
-
-            JsonSerializer serializer = new JsonSerializer();
-
             Bitmap bmp = new Bitmap(path);
-            ARGBModel[,] argbObject = new ARGBModel[bmp.Height, bmp.Width];
 
-            Rectangle rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
+            int height = bmp.Height;
+            int width = bmp.Width;
+
+            Rectangle rect = new Rectangle(0, 0, width, height);
             BitmapData bmpData = bmp.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+
+            List<ARGBModel> aRGBs = new List<ARGBModel>();
 
             unsafe
             {
@@ -41,67 +39,43 @@ namespace IManip.Core
 
                     for (int x = 0; x < bmp.Width; x++)
                     {
-                        argbObject[y, x] = new ARGBModel();
                         var pixel = row + x * 4;
 
-                        argbObject[y, x].A = pixel[3];
-                        argbObject[y, x].R = pixel[2];
-                        argbObject[y, x].G = pixel[1];
-                        argbObject[y, x].B = pixel[0];
+                        aRGBs.Add(new ARGBModel()
+                        {
+                            A = pixel[3],
+                            R = pixel[2],
+                            G = pixel[1],
+                            B = pixel[0]
+                        });
                     }
                 }
             }
-
-            using (StreamWriter sw = new StreamWriter(pathToSaveFile + "\\temp\\log.json", false, System.Text.Encoding.UTF8))
-            using (JsonWriter writer = new JsonTextWriter(sw))
-            {
-                serializer.Serialize(writer, argbObject);
-            }
-        }
-
-        internal Bitmap GettingPixelsFromJsonFile()
-        {
-            string result;
-
-            using (StreamReader fs = new StreamReader(pathToSaveFile + "\\temp\\log.json"))
-            {
-                result = fs.ReadToEnd();
-            }
-
-            var ARGBModel = JsonConvert.DeserializeObject<ARGBModel[,]>(result);
-            var ARGBList = new List<ARGBModel>();
-
-            int height = ARGBModel.GetLength(0), width = ARGBModel.GetLength(1);
-
-            //Check proportionality
 
             if (height > width)
                 height = width;
             else
                 width = height;
 
-            for (int i = 0; i < height; i++)
-            {
-                for (int j = 0; j < width; j++)
-                {
-                    ARGBList.Add(ARGBModel[i, j]);
-                }
-            }
 
             int currentWidth = (width * 2) + EXPANSION;
             int currentHeight = (height * 2) + EXPANSION;
 
-            var PixelArray = AddNewPixelsToOld(ARGBList, currentWidth, currentHeight);
-            var Result = ColorizeNewPixels(PixelArray, currentWidth, currentHeight);
+            var result = AddOldToNewPixels(aRGBs, currentWidth, currentHeight)
+                         .ColorizeNewPixels(currentWidth, currentHeight)
+                         .GetBitmap(currentWidth, currentHeight);
 
-            return GetBitmap(Result, currentWidth, currentHeight);
+            if (contrast)
+                result = result.ApplyContrast();
 
+            if (harshness)
+                result = result.ApplyHarshness();
+
+            return result.SaveImage();
         }
-
-        private Color[,] AddNewPixelsToOld(List<ARGBModel> ARGBList, int currentWidth, int currentHeight)
+        private static Color[,] AddOldToNewPixels(List<ARGBModel> ARGBList, int currentWidth, int currentHeight)
         {
             int position = 0;
-
             Color[,] result = new Color[currentWidth, currentHeight];
 
             for (int i = 0; i < currentWidth; i++)
@@ -126,8 +100,7 @@ namespace IManip.Core
 
             return result;
         }
-
-        private Color[,] ColorizeNewPixels(Color[,] pixels, int currentWidth, int currentHeight)
+        private static Color[,] ColorizeNewPixels(this Color[,] pixels, int currentWidth, int currentHeight)
         {
             Color EmptyPixel = Color.FromArgb(255, 255, 255, 255);
             Color[,] result = pixels;
@@ -297,27 +270,7 @@ namespace IManip.Core
 
             return result;
         }
-
-        private Bitmap GetBitmap(Color[,] pixels, int currentWidth, int currentHeight)
-        {
-            Bitmap result = new Bitmap(currentWidth, currentHeight, PixelFormat.Format32bppArgb);
-
-            for (int i = 0; i < currentWidth; i++)
-            {
-                for (int j = 0; j < currentHeight; j++)
-                {
-                    result.SetPixel(i, j, pixels[i, j]);
-                }
-            }
-
-            result = AddContrast(result);
-
-            result.RotateFlip(RotateFlipType.RotateNoneFlipNone);
-
-            return result;
-        }
-
-        private Color PackagingColor(params Color[] colors)
+        private static Color PackagingColor(params Color[] colors)
         {
             //0..3 - near
             //4..7 - obliquely
@@ -356,89 +309,23 @@ namespace IManip.Core
 
             return content;
         }
-
-        public Bitmap AddContrast(Bitmap currentBitmap)
+        private static Bitmap GetBitmap(this Color[,] pixels, int currentWidth, int currentHeight)
         {
-            Color c;
-            float contrast = 5.0f;
+            Bitmap result = new Bitmap(currentWidth, currentHeight, PixelFormat.Format32bppArgb);
 
-            if (contrast < -100.0f)
-                contrast = -100.0f;
-
-            if (contrast > 100.0f)
-                contrast = 100.0f;
-
-            contrast = (100.0f + contrast) / 100.0f;
-            contrast *= contrast;
-
-            Bitmap temp = currentBitmap;
-            Bitmap result = temp.Clone() as Bitmap;
-
-            Rectangle rect = new Rectangle(0, 0, temp.Width, temp.Height);
-            BitmapData bmpData = temp.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
-
-            unsafe
+            for (int i = 0; i < currentWidth; i++)
             {
-                byte* ptr = (byte*)bmpData.Scan0;
-
-                for (int y = 0; y < temp.Width; y++)
+                for (int j = 0; j < currentHeight; j++)
                 {
-                    var row = ptr + (y * bmpData.Stride);
-
-                    for (int x = 0; x < temp.Height; x++)
-                    {
-                        var pixel = row + x * 4;
-
-                        c = Color.FromArgb(pixel[3], pixel[2], pixel[1], pixel[0]);
-
-                        float pR = c.R / 255.0f;
-                        pR -= 0.5f;
-                        pR *= contrast;
-                        pR += 0.5f;
-                        pR *= 255;
-
-                        if (pR < 0)
-                            pR = 0;
-
-                        if (pR > 255)
-                            pR = 255;
-
-                        float pG = c.G / 255.0f;
-                        pG -= 0.5f;
-                        pG *= contrast;
-                        pG += 0.5f;
-                        pG *= 255;
-
-                        if (pG < 0)
-                            pG = 0;
-
-                        if (pG > 255)
-                            pG = 255;
-
-                        float pB = c.B / 255.0f;
-                        pB -= 0.5f;
-                        pB *= contrast;
-                        pB += 0.5f;
-                        pB *= 255;
-
-                        if (pB < 0)
-                            pB = 0;
-
-                        if (pB > 255)
-                            pB = 255;
-
-                        result.SetPixel(y, x, Color.FromArgb((byte)pR, (byte)pG, (byte)pB));
-                    }
+                    result.SetPixel(i, j, pixels[i, j]);
                 }
             }
 
             return result;
         }
 
-        internal BitmapImage MyConvertBitmap()
+        private static BitmapImage SaveImage(this Bitmap bitmap)
         {
-            Bitmap bitmap = GettingPixelsFromJsonFile();
-
             MemoryStream ms = new MemoryStream();
 
             bitmap.Save(ms, ImageFormat.Png);
@@ -451,10 +338,10 @@ namespace IManip.Core
             image.EndInit();
 
             Image img = Image.FromStream(ms);
-            //img.RotateFlip(RotateFlipType.Rotate90FlipX);
-            img.Save(pathToSaveFile + "\\temp\\Picture" + String.Format("{0:yMdhms}", DateTime.Now) + ".png", ImageFormat.Png);
+            img.Save(_pathToSaveFile + "\\temp\\Picture" + String.Format("{0:yMdhms}", DateTime.Now) + ".png", ImageFormat.Png);
 
             return image;
+
         }
 
     }

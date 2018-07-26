@@ -74,6 +74,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Core\Manip.cs" />
+    <Compile Include="Core\MCore.cs" />
+    <Compile Include="Core\Module\Contrast.cs" />
+    <Compile Include="Core\Module\Harshness.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
