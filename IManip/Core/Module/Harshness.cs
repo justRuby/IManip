@@ -12,101 +12,85 @@ namespace IManip.Core.Module
 {
     public static class Harshness
     {
+        private static double[,] filter1 = new double[,]
+                                         {{0, -1, 0},
+                                          {-1, 5, -1},
+                                          {0, -1, 0}};
 
-        private static double[,] kernel = new double[,]
-                                         {{0.11, 0.11, 0.11},
-                                          {0.11, 0.11, 0.11},
-                                          {0.11, 0.11, 0.11}};
+        private static double[,] filter2 = new double[,]
+                                         {{0, -1, -1, -1, 0},
+                                          {-1, -1, 2, -1, -1},
+                                          {-1, 2, 6, 2, -1},
+                                          {-1, -1, 2, -1, -1},
+                                          {0, -1, -1, -1, 0 } };
 
-        public static Bitmap ApplyHarshness(this Bitmap input)
+        public static Bitmap ApplySharpen(this Bitmap content)
         {
-            byte[] inputBytes;
-            using (MemoryStream memoryStream = new MemoryStream())
+            Bitmap sharpenImage = new Bitmap(content);
+
+            int filterWidth = 3;
+            int filterHeight = 3;
+            int w = content.Width;
+            int h = content.Height;
+
+            double factor = 1;
+            double bias = 3.16;
+
+            Color[,] result = new Color[content.Width, content.Height];
+
+            for (int x = 0; x < w; ++x)
             {
-                input.Save(memoryStream, ImageFormat.Jpeg);
-                inputBytes = memoryStream.ToArray();
-            }
-
-            int width = input.Width;
-            int height = input.Height;
-
-            int kernelWidth = kernel.GetLength(0);
-            int kernelHeight = kernel.GetLength(1);
-
-            ARGBModel[,] output = new ARGBModel[width, height];
-
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
+                for (int y = 0; y < h; ++y)
                 {
-                    double rSum = 0, gSum = 0, bSum = 0, kSum = 0;
+                    double red = 0.0, green = 0.0, blue = 0.0;
 
-                    output[x, y] = new ARGBModel();
+                    Color imageColor = content.GetPixel(x, y);
 
-                    for (int i = 0; i < kernelWidth; i++)
+                    for (int filterX = 0; filterX < filterWidth; filterX++)
                     {
-                        for (int j = 0; j < kernelHeight; j++)
+                        for (int filterY = 0; filterY < filterHeight; filterY++)
                         {
-                            int pixelPosX = x + (i - (kernelWidth / 2));
-                            int pixelPosY = y + (j - (kernelHeight / 2));
-                            if ((pixelPosX < 0) ||
-                              (pixelPosX >= width) ||
-                              (pixelPosY < 0) ||
-                              (pixelPosY >= height)) continue;
+                            int imageX = (x - filterWidth / 2 + filterX + w) % w;
+                            int imageY = (y - filterHeight / 2 + filterY + h) % h;
 
-                            byte r = input.GetPixel(x, y).R;
-                            byte g = input.GetPixel(x, y).G;
-                            byte b = input.GetPixel(x, y).B;
+                            imageColor = content.GetPixel(imageX, imageY);
 
-                            double kernelVal = kernel[i, j];
 
-                            rSum += r * kernelVal;
-                            gSum += g * kernelVal;
-                            bSum += b * kernelVal;
+                            if (imageColor.R >= 155 &&
+                                imageColor.G >= 155 &&
+                                imageColor.B >= 155)
+                            {
+                                factor = 1;
+                            }
+                            else
+                            {
+                                factor = 0.9;
+                            }
 
-                            kSum += kernelVal;
-
+                            red += imageColor.R * filter1[filterX, filterY];
+                            green += imageColor.G * filter1[filterX, filterY];
+                            blue += imageColor.B * filter1[filterX, filterY];
                         }
+                        int r = Math.Min(Math.Max((int)(factor * red + bias), 0), 255);
+                        int g = Math.Min(Math.Max((int)(factor * green + bias), 0), 255);
+                        int b = Math.Min(Math.Max((int)(factor * blue + bias), 0), 255);
 
+                        result[x, y] = Color.FromArgb(r, g, b);
                     }
-
-                    if (kSum <= 0) kSum = 1;
-
-                    rSum /= kSum;
-                    if (rSum < 0) rSum = 0;
-                    if (rSum > 255) rSum = 255;
-
-                    gSum /= kSum;
-                    if (gSum < 0) gSum = 0;
-                    if (gSum > 255) gSum = 255;
-
-                    bSum /= kSum;
-                    if (bSum < 0) bSum = 0;
-                    if (bSum > 255) bSum = 255;
-
-                    output[x, y].R = (byte)rSum;
-                    output[x, y].G = (byte)gSum;
-                    output[x, y].B = (byte)bSum;
                 }
             }
 
-                Bitmap result = new Bitmap(width, height, PixelFormat.Format32bppArgb);
 
-                for (int i = 0; i < width; i++)
+            for (int i = 0; i < w; ++i)
+            {
+                for (int j = 0; j < h; ++j)
                 {
-                    for (int j = 0; j < height; j++)
-                    {
-                        result.SetPixel(i, j, Color.FromArgb(output[i, j].A,
-                                                             output[i, j].R,
-                                                             output[i, j].G,
-                                                             output[i, j].B));
-                    }
+                    sharpenImage.SetPixel(i, j, result[i, j]);
                 }
+            }
 
-                return result;
+            return sharpenImage;
         }
-
-
 
     }
 }

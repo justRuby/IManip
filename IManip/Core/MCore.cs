@@ -65,11 +65,13 @@ namespace IManip.Core
                          .ColorizeNewPixels(currentWidth, currentHeight)
                          .GetBitmap(currentWidth, currentHeight);
 
+
+            if (harshness)
+                result = result.ApplySharpen();
+
             if (contrast)
                 result = result.ApplyContrast();
 
-            if (harshness)
-                result = result.ApplyHarshness();
 
             return result.SaveImage();
         }
@@ -327,7 +329,6 @@ namespace IManip.Core
         private static BitmapImage SaveImage(this Bitmap bitmap)
         {
             MemoryStream ms = new MemoryStream();
-
             bitmap.Save(ms, ImageFormat.Png);
             BitmapImage image = new BitmapImage();
 
@@ -339,6 +340,8 @@ namespace IManip.Core
 
             Image img = Image.FromStream(ms);
             img.Save(_pathToSaveFile + "\\temp\\Picture" + String.Format("{0:yMdhms}", DateTime.Now) + ".png", ImageFormat.Png);
+
+            //ms.Dispose();
 
             return image;
 
